@@ -72,4 +72,31 @@ void loop() {
   analogWrite(M_redLedPin, mapBrightness(valMiddle));
 
   Serial.print(valLeft); Serial.print(" "); Serial.print(valRight); Serial.print(" "); Serial.println(valMiddle);
+
+  //MAZE WALTZ
+  if (valMiddle > 4) {
+    if (valLeft <= 4 && valRight <= 4) {
+        int diff = valRight - valLeft;
+        int rot_offset = pow(diff, 3);
+        rot_offset = constrain(rot_offset, -100, 100);
+        int forward = 125 - abs(rot_offset)/2;
+        move(forward, rot_offset);
+    }
+    else if (valLeft <= 4) {
+        int rot_offset = pow(4 - valLeft, 2);
+        move(125, rot_offset);
+    }
+    else if (valRight <= 4) {
+        int rot_offset = -pow(4 - valRight, 2);
+        move(125, rot_offset);
+    }
+    else move(150, 0);
+  }
+  else {
+    if (valLeft <= 4 && valRight <= 4) move(0, 100);
+    else if (valLeft > 4) move(0, -100);
+    else if (valRight > 4) move(0, 100);
+  }
+
+  delay(250);
 }
