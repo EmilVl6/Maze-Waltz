@@ -3,7 +3,7 @@
 Servo servoLeft;
 Servo servoRight;
 
-#define DELAY 5000
+#define DELAY 1000
 #define MOFFSET 0
 
 const int L_irLedPin = 10, L_irReceiverPin = 11, L_redLedPin = A2;
@@ -25,10 +25,10 @@ void setup() {
   move(100, 0);
 }
 
-#define freqStart 37000
-#define freqEnd 43000
+#define freqStart 38000
+#define freqEnd 42000
 #define freqStep 1000
-#define distMax 7
+#define distMax 5
 
 #define Fwd 1
 #define TurnL 2
@@ -39,8 +39,8 @@ void setup() {
 #define timeTurn 1700
 
 #define moveFwd 100
-#define veer 10
-#define turn 20
+#define veer 30
+#define turn 40
 
 int valLeft = 0, valRight = 0, valMiddle = 0; int MotionState = Fwd; bool deadEnd = 1;
 
@@ -61,21 +61,21 @@ void loop() {
       }
       if(valLeft > valRight) {
         Serial.println("Veer Left");
-        move(moveFwd - veer/2, veer/2);
+        move(moveFwd - veer/2, -veer/2);
       }
       if(valRight > valLeft) {
         Serial.println("Veer Right");
-        move(moveFwd - veer/2, -veer/2);
+        move(moveFwd - veer/2, veer/2);
       }
-      if(valLeft>=distMax) {
+      if(valLeft>=distMax && valMiddle<distMax) {
         MotionState = TurnL;
         break;
       }
-      if(valRight>=distMax) {
+      if(valRight>=distMax && valMiddle<distMax) {
         MotionState = TurnR;
         break;
       }
-      if(valLeft<distMax && valRight<distMax && valMiddle<distMax) {
+      if(valLeft<distMax && valRight<distMax && valMiddle<distMax-2) {
         MotionState = DeadEnd;
         break;
       }
@@ -83,8 +83,10 @@ void loop() {
     }
     case TurnL: {
       Serial.println("TurnL");
-      move(-turn/2, turn/2);      
-      delay(timeTurn);
+      move(moveFwd/2, 0);
+      delay(timeExit*5);
+      move(turn/2, -turn/2);      
+      delay(timeTurn*1.2);
       move(moveFwd, 0);
       delay(timeExit);
       MotionState=Fwd;
@@ -92,8 +94,10 @@ void loop() {
     }
     case TurnR: {
       Serial.println("TurnR");
-      move(-turn/2, -turn/2);      
-      delay(timeTurn);
+      move(moveFwd/2, 0);
+      delay(timeExit*5);
+      move(turn/2, turn/2);      
+      delay(timeTurn*1.1);
       move(moveFwd, 0);
       delay(timeExit);
       MotionState=Fwd;
@@ -102,8 +106,8 @@ void loop() {
     case DeadEnd: {
       if(deadEnd) {
         Serial.println("DeadEnd");
-        move(-turn/2, -turn/2);      
-        delay(timeTurn*2);
+        move(0, -turn);      
+        delay(timeTurn*1.4);
         move(moveFwd, 0);
         delay(timeExit);
         MotionState=Fwd;
