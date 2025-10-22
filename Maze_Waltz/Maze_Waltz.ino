@@ -1,53 +1,14 @@
 #include <Servo.h>
 
-#define DELAY 5000
-#define MOFFSET -10
-
 Servo servoLeft;
 Servo servoRight;
 
-int valLeft, valRight, valMiddle = 0;
+#define DELAY 5000
+#define MOFFSET 0
 
 const int L_irLedPin = 10, L_irReceiverPin = 11, L_redLedPin = A2;
 const int R_irLedPin =  2, R_irReceiverPin =  3, R_redLedPin = A0;
 const int M_irLedPin =  6, M_irReceiverPin =  7, M_redLedPin = A1;
-
-// Forward: 0 to 200 & Rotation: -100 to 100
-void move(int forward, int rotation) {
-  forward = constrain(forward, 0, 200);
-  rotation = constrain(rotation, -100, 100);
-
-  int leftPWM = 1500 - forward + rotation - MOFFSET/2;
-  int rightPWM = 1500 + forward + rotation + MOFFSET/2;
-
-  leftPWM = constrain(leftPWM, 1300, 1700);
-  rightPWM = constrain(rightPWM, 1300, 1700);
-  
-  servoLeft.writeMicroseconds(leftPWM);
-  servoRight.writeMicroseconds(rightPWM);
-}
-
-int irDetect(int irLedPin, int irReceiverPin, long frequency) {
-  tone(irLedPin, frequency);
-  delay(1);
-  int ir = digitalRead(irReceiverPin);
-  noTone(irLedPin);
-  delay(1);
-  return ir;
-}
-
-int irDistance(int irLedPin, int irReceiverPin) {
-  int distance = 0;
-  for(long f = 38000; f <= 42000; f += 1000) {
-    distance += irDetect(irLedPin, irReceiverPin, f);
-  }
-  return distance;
-}
-
-int mapBrightness(int val) {
-  int level = 5 - constrain(val, 0, 5);
-  return map(level, 0, 5, 0, 255);
-}
 
 void setup() {
   servoLeft.attach(12); servoRight.attach(13);
@@ -60,43 +21,134 @@ void setup() {
 
   Serial.begin(9600);
   delay(DELAY);
+
+  move(100, 0);
 }
 
-void loop() {
-  valLeft = irDistance(L_irLedPin, L_irReceiverPin);
-  valRight = irDistance(R_irLedPin, R_irReceiverPin);
-  valMiddle = irDistance(M_irLedPin, M_irReceiverPin);
+#define freqStart 37000
+#define freqEnd 43000
+#define freqStep 1000
+#define distMax 7
 
-  analogWrite(L_redLedPin, mapBrightness(valLeft));
-  analogWrite(R_redLedPin, mapBrightness(valRight));
-  analogWrite(M_redLedPin, mapBrightness(valMiddle));
+#define Fwd 1
+#define TurnL 2
+#define TurnR 3
+#define DeadEnd 4
+
+#define timeExit 100
+#define timeTurn 1700
+
+#define moveFwd 100
+#define veer 10
+#define turn 20
+
+int valLeft = 0, valRight = 0, valMiddle = 0; int MotionState = Fwd; bool deadEnd = 1;
+
+void loop() {
+  valLeft = irDistance(L_irLedPin, L_irReceiverPin, L_redLedPin);
+  valRight = irDistance(R_irLedPin, R_irReceiverPin, R_redLedPin);
+  valMiddle = irDistance(M_irLedPin, M_irReceiverPin, M_redLedPin);
 
   Serial.print(valLeft); Serial.print(" "); Serial.print(valRight); Serial.print(" "); Serial.println(valMiddle);
 
   //MAZE WALTZ
-  if (valMiddle > 4) {
-    if (valLeft <= 4 && valRight <= 4) {
-        int diff = valRight - valLeft;
-        int rot_offset = pow(diff, 3);
-        rot_offset = constrain(rot_offset, -100, 100);
-        int forward = 125 - abs(rot_offset)/2;
-        move(forward, rot_offset);
+  switch(MotionState) {
+    case Fwd: {
+      Serial.println("Fwd");
+      if(valLeft == valRight) {
+        Serial.println("Straight");
+        move(moveFwd, 0);
+      }
+      if(valLeft > valRight) {
+        Serial.println("Veer Left");
+        move(moveFwd - veer/2, veer/2);
+      }
+      if(valRight > valLeft) {
+        Serial.println("Veer Right");
+        move(moveFwd - veer/2, -veer/2);
+      }
+      if(valLeft>=distMax) {
+        MotionState = TurnL;
+        break;
+      }
+      if(valRight>=distMax) {
+        MotionState = TurnR;
+        break;
+      }
+      if(valLeft<distMax && valRight<distMax && valMiddle<distMax) {
+        MotionState = DeadEnd;
+        break;
+      }
+    break;
     }
-    else if (valLeft <= 4) {
-        int rot_offset = pow(4 - valLeft, 2);
-        move(125, rot_offset);
+    case TurnL: {
+      Serial.println("TurnL");
+      move(-turn/2, turn/2);      
+      delay(timeTurn);
+      move(moveFwd, 0);
+      delay(timeExit);
+      MotionState=Fwd;
+    break;
     }
-    else if (valRight <= 4) {
-        int rot_offset = -pow(4 - valRight, 2);
-        move(125, rot_offset);
+    case TurnR: {
+      Serial.println("TurnR");
+      move(-turn/2, -turn/2);      
+      delay(timeTurn);
+      move(moveFwd, 0);
+      delay(timeExit);
+      MotionState=Fwd;
+    break;
     }
-    else move(150, 0);
-  }
-  else {
-    if (valLeft <= 4 && valRight <= 4) move(0, 100);
-    else if (valLeft > 4) move(0, -100);
-    else if (valRight > 4) move(0, 100);
+    case DeadEnd: {
+      if(deadEnd) {
+        Serial.println("DeadEnd");
+        move(-turn/2, -turn/2);      
+        delay(timeTurn*2);
+        move(moveFwd, 0);
+        delay(timeExit);
+        MotionState=Fwd;
+        deadEnd = 0;
+      }
+      else {
+        Serial.println("End");
+        move(0, 0);      
+      }
+    break;
+    }    
   }
 
-  delay(250);
+  //delay(100);
+}
+
+// Forward: -200 to 200 & Rotation: -100 to 100
+void move(int forward, int rotation) {
+  forward = constrain(forward, -200, 200);
+  rotation = constrain(rotation, -100, 100);
+
+  int leftPWM = 1500 - forward + rotation - MOFFSET/2;
+  int rightPWM = 1500 + forward + rotation + MOFFSET/2;
+
+  leftPWM = constrain(leftPWM, 1300, 1700);
+  rightPWM = constrain(rightPWM, 1300, 1700);
+  
+  servoLeft.writeMicroseconds(leftPWM);
+  servoRight.writeMicroseconds(rightPWM);
+}
+
+int irDetect(long frequency, int irLedPin, int irReceiverPin, int redLedPin) {
+  tone(irLedPin, frequency);
+  delay(1);
+  int ir = digitalRead(irReceiverPin);
+  digitalWrite(redLedPin, !ir);
+  noTone(irLedPin);
+  delay(1);
+  return ir;
+}
+
+int irDistance(int irLedPin, int irReceiverPin, int redLedPin) {
+  int distance = 0;
+  for(long f = freqStart; f <= freqEnd; f += freqStep) {
+    distance += irDetect(f, irLedPin, irReceiverPin, redLedPin);
+  }
+  return distance;
 }
