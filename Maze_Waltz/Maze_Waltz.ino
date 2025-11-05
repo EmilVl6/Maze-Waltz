@@ -37,14 +37,12 @@ void setup() {
 
 #define timeExit 100
 #define timeTurn 1700
-#define longDeadEndThreshold 1500
 
 #define moveFwd 100
 #define veer 30
 #define turn 40
 
-int valLeft = 0, valRight = 0, valMiddle = 0; int MotionState = Fwd; 
-bool deadEnd = 1; unsigned long straightStartTime = 0; bool timingCorridorLength = false;
+int valLeft = 0, valRight = 0, valMiddle = 0; int MotionState = Fwd; bool deadEnd = 1;
 
 void loop() {
   valLeft = irDistance(L_irLedPin, L_irReceiverPin, L_redLedPin);
@@ -57,50 +55,27 @@ void loop() {
   switch(MotionState) {
     case Fwd: {
       Serial.println("Fwd");
-      
-      if(!timingCorridorLength && valLeft >= distMax && valRight >= distMax) {
-        straightStartTime = millis();
-        timingCorridorLength = true;
-        Serial.println("Starting corridor timer");
-      }
-      
       if(valLeft == valRight) {
         Serial.println("Straight");
         move(moveFwd, 0);
       }
-      if(valLeft > valRight && valLeft >= distMax && valRight >= distMax) {
+      if(valLeft > valRight) {
         Serial.println("Veer Left");
         move(moveFwd - veer/2, -veer/2);
       }
-      if(valRight > valLeft && valLeft >= distMax && valRight >= distMax) {
+      if(valRight > valLeft) {
         Serial.println("Veer Right");
         move(moveFwd - veer/2, veer/2);
       }
       if(valLeft>=distMax && valMiddle<distMax) {
-        timingCorridorLength = false;
         MotionState = TurnL;
         break;
       }
       if(valRight>=distMax && valMiddle<distMax) {
-        timingCorridorLength = false;
         MotionState = TurnR;
         break;
       }
       if(valLeft<distMax && valRight<distMax && valMiddle<distMax-2) {
-        unsigned long corridorDuration = 0;
-        if(timingCorridorLength) {
-          corridorDuration = millis() - straightStartTime;
-          Serial.print("Corridor duration: ");
-          Serial.println(corridorDuration);
-        }
-        timingCorridorLength = false;
-        
-        if(corridorDuration >= longDeadEndThreshold) {
-          Serial.println("Long Dead End");
-          deadEnd = 0;
-        } else {
-          Serial.println("Short Dead End");
-        }
         MotionState = DeadEnd;
         break;
       }
